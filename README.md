@@ -9,3 +9,5 @@ messages for the display based on user actions and pulls the .ui inputs and proc
 for arrays of fault data over a specified time to the arPull.py program which does the archiver pulls and separates the data into types of
 faults and generates recovery statistics.  The arPull.py program can be run standalone in a python (not pydm) enviroment to test archiver
 interface, numeric manipulation and arrays for display generation.  Common test functions are contained in the __init__main at the bottom.
+
+The **back version of the file pops up the XFEL fault plot in a separate display.  This might be preferable if using the plot for a presentation.  The XFEL type display shows the days from now at the bottom, so if no date is selected,  you'll see about -7000 days (since 2000).  
