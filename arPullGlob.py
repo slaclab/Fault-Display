@@ -7,6 +7,7 @@ import requests
 import numpy
 import random
 import PyQt5
+from lcls_tools.devices.scLinac import LINAC_OBJECTS
 
 global resultsFB, resultsIntlk, resultsRfRdy, startTime, endTime
 resultsFB={} 
@@ -27,35 +28,10 @@ def makList():
     #################
 
     pvList = []
-    #cavPv = []
-    for lin in range(4):     #  for the 4 linac sections
-        if lin == 0:         #  start with L0B
-            for j in range(1, 9):
-                pvList.append("ACCL:L" + str(lin) + "B:01" + str(j))
-        if lin == 1:         # move to L1B and do two 1.3GHz CM
-            for n in range(2, 4):
-                for j in range(1, 9):
-                    pvList.append("ACCL:L" + str(lin) + "B:" + "0" + str(n) + str(j))
-                             # then do the H1 and H2 3.9 GHz CM
-            for n in range(1, 3):
-                for j in range(1, 9):
-                    pvList.append("ACCL:L" + str(lin) + "B:" + "H" + str(n) + str(j))
-                             # move on to the 12 CMs in L2B
-        if lin == 2:
-            for n in range(4, 16):
-                if n < 10:
-                    for j in range(1, 9):
-                        pvList.append("ACCL:L" + str(lin) + "B:" + "0" + str(n) + str(j))
-                             # remember to adjust CM number in PV if greater than '10'
-                else:
-                    for j in range(1, 9):
-                        pvList.append("ACCL:L" + str(lin) + "B:" + str(n) + str(j))
-                             # Finally, do the 20 CMs in L3B
-        if lin == 3:
-            for n in range(16, 36):
-                for j in range(1, 9):
-                    pvList.append("ACCL:L" + str(lin) + "B:" + str(n) + str(j))
-
+    for lo in LINAC_OJECTS:
+        for cm in lo.cryomodules:
+            for cav in lo.cryomodules[cm].cavities:
+                pvList.append(lo.cryomodules[cm].cavities[cav].pvPrefix)
     return pvList;
 
 
@@ -84,7 +60,7 @@ class Archiver(object):
             startTime = (time.mktime(datetime.datetime.startTime(strtTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))
             endTime = int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))
             cavPv=makList()
-            codeFlt = ["0:FB_SUM", "0:RFS:INTLK_FIRST", "0:RFREADYFORBEAM"]
+            codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
             for pv in cavPv:
                     cavPvFB.append(str(pv)+codeFlt[0])
                     cavPvIntlk.append(str(pv)+codeFlt[1])
@@ -144,7 +120,7 @@ def getValuesOverTimeDummy(strtTim, endTim, timeInterval=None):
         endTime = int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))
              
         pvList=makList()
-        codeFlt = ["0:FB_SUM", "0:RFS:INTLK_FIRST", "0:RFREADYFORBEAM"]
+        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
         for pv in pvList:
             for i in range(3):
                 cavPv.append(str(pv) + codeFlt[i])
@@ -270,7 +246,7 @@ def CmStats():
     stDHi=[]
     
     pvList = makList()
-    codeFlt = ["0:FB_SUM", "0:RFS:INTLK_FIRST", "0:RFREADYFORBEAM"]
+    codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
     for pv in pvList:
         CavFltDat= (resultsIntlk[(str(pv)+ codeFlt[1])]['times'])
         CavRdyDat= (resultsRfRdy[(str(pv)+ codeFlt[2])]['times'])
