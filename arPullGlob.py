@@ -7,6 +7,8 @@ import requests
 import numpy
 import random
 import PyQt5
+from lcls_tools.devices.scLinac import LINAC_OBJECTS
+from lcls_tools.data_analysis.archiver import Archiver, ArchiverData
 
 global resultsFB, resultsIntlk, resultsRfRdy, startTime, endTime
 resultsFB={} 
@@ -22,108 +24,71 @@ TIMEOUT = 3
 
 def makList():
     #################
-    # this function generates a PV list for cavities
-    # in SC linac
+    # this function generates a PV prefix list for cavities
+    # in SC linac like 'ACCL:L0B:0110:'
     #################
 
     pvList = []
-    #cavPv = []
-    for lin in range(4):     #  for the 4 linac sections
-        if lin == 0:         #  start with L0B
-            for j in range(1, 9):
-                pvList.append("ACCL:L" + str(lin) + "B:01" + str(j))
-        if lin == 1:         # move to L1B and do two 1.3GHz CM
-            for n in range(2, 4):
-                for j in range(1, 9):
-                    pvList.append("ACCL:L" + str(lin) + "B:" + "0" + str(n) + str(j))
-                             # then do the H1 and H2 3.9 GHz CM
-            for n in range(1, 3):
-                for j in range(1, 9):
-                    pvList.append("ACCL:L" + str(lin) + "B:" + "H" + str(n) + str(j))
-                             # move on to the 12 CMs in L2B
-        if lin == 2:
-            for n in range(4, 16):
-                if n < 10:
-                    for j in range(1, 9):
-                        pvList.append("ACCL:L" + str(lin) + "B:" + "0" + str(n) + str(j))
-                             # remember to adjust CM number in PV if greater than '10'
-                else:
-                    for j in range(1, 9):
-                        pvList.append("ACCL:L" + str(lin) + "B:" + str(n) + str(j))
-                             # Finally, do the 20 CMs in L3B
-        if lin == 3:
-            for n in range(16, 36):
-                for j in range(1, 9):
-                    pvList.append("ACCL:L" + str(lin) + "B:" + str(n) + str(j))
-
+    for lo in LINAC_OBJECTS:
+        for cm in lo.cryomodules:
+            for cav in lo.cryomodules[cm].cavities:
+                pvList.append(lo.cryomodules[cm].cavities[cav].pvPrefix)
     return pvList;
 
 
-
-class Archiver(object):
-
-
-    def __init__(self, machine):
-        # type: (str) -> None
-        self.url_formatter = ARCHIVER_URL_FORMATTER.format(MACHINE=machine)
-        
-        #******************************************************
-
 #******************************************************
 
-    def getValuesOverTimeRange(self, strtTim, endTim, timeInterval=None):
+def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
  #       # type: (List[str], datetime, datetime, int) -> Dict[str, Dict[str, List[Union[datetime, str]]]]
-        global resultsFB, resultsIntlk, resultsRfRdy, startTime, endTime
-        pvList=[]
-        cavPvRfRdy={}
-        cavPvFB={}
-        cavPvIntlk={}
+    global resultsFB, resultsIntlk, resultsRfRdy, startTime, endTime
+    pvList=[]
+    results={}
+    cavPvRfRdy=[]
+    cavPvFB=[]
+    cavPvIntlk=[]
+    cavPv=[]
 
-        #global cavPvFB, cavPvIntlk, cavPvRfRdy
-        if (resultsFB == {}) or (strtTim != (time.mktime(datetime.datetime.startTime(strtTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))) or (endTime != int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))):
-            startTime = (time.mktime(datetime.datetime.startTime(strtTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))
-            endTime = int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))
-            cavPv=makList()
-            codeFlt = ["0:FB_SUM", "0:RFS:INTLK_FIRST", "0:RFREADYFORBEAM"]
-            for pv in cavPv:
-                    cavPvFB.append(str(pv)+codeFlt[0])
-                    cavPvIntlk.append(str(pv)+codeFlt[1])
-                    cavPvRfRdy.append(str(pv)+codeFlt[2])
-            for pv in cavPv:
-                for i in range(3):
-                    pvList.append(str(pv) + codeFlt[i])
-            
-            url = self.url_formatter.format(SUFFIX=RANGE_RESULT_SUFFIX)
+    archiver=Archiver("lcls")
 
-            for pv in pvList:
-                       response = requests.get(url=url, timeout=TIMEOUT,
-                                               params={"pv": pv,
-                                                       "from": strtTim.isoformat() + "-07:00",
-                                                       "to": endTim.isoformat() + "-07:00"})
-                       results = {}
+    #global cavPvFB, cavPvIntlk, cavPvRfRdy
+    if (resultsFB == {}) or (strtTim != (time.mktime(datetime.datetime.strptime(strtTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))) or (endTime != int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))):
+        print("We're in!")
+        startTime = datetime.datetime.strptime(strtTim, '%m/%d/%Y %H:%M:%S' )
+        endTime = datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' )
+        print('Start time {}'.format(startTime))
+        print('End time {}'.format(endTime))
+        cavPv=makList()
+# For after Sonya adds FB_SUM to the list
+#        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+        for pv in cavPv:
+            cavPvFB.append(str(pv)+codeFlt[0])
+            cavPvIntlk.append(str(pv)+codeFlt[1])
+            cavPvRfRdy.append(str(pv)+codeFlt[2])
+        for pv in cavPv:
+            for i in range(3):
+                pvList.append(str(pv) + codeFlt[i])
+
+        for pv in pvList:
+            print('PV: {}'.format(pv))
+            archiverData=archiver.getValuesOverTimeRange([pv],startTime,endTime)
+            result={"times":[],"values":[]}
+            result["values"]=archiverData.values[pv]
+            for ts in archiverData.timeStamps[pv]:
+                result["times"].append(ts.timestamp()) # convert datetime to posix time
+            results[pv] = result
     
-                       try:
-                           jsonData = json.loads(response.text)
-                           element = jsonData.pop()
-                           result = {"times": [], "values": []}
-                           for datum in element[u'data']:
-                               result["times"].append(datum[u'secs'])
-                               result["values"].append(datum[u'val'])
+#        print(results)
+        for cav in cavPvFB:
+            resultsFB[cav]=results[cav]
+        for cav1 in cavPvIntlk:
+            resultsIntlk[cav1]=results[cav1]
+        for cav2 in cavPvRfRdy:
+            resultsRfRdy[cav2]=results[cav2]
     
-                           results[pv] = result["values"],result["times"]
-    
-    
-                           for cav in cavPvFB:
-                                resultsFB.append(results[cav])
-                           for cav1 in cavPvIntlk:
-                                resultsIntlk.append(results[cav1])
-                           for cav2 in cavPvRfRdy:
-                                resultsRfRdy.append(results[cav2])
-    
-                       except ValueError:
-                           print("JSON error with {PVS}".format(PVS=pvList))
-        else:
-            return;
+    else:
+       print('got elsed')
+       return;
             
 
 
@@ -144,7 +109,9 @@ def getValuesOverTimeDummy(strtTim, endTim, timeInterval=None):
         endTime = int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))
              
         pvList=makList()
-        codeFlt = ["0:FB_SUM", "0:RFS:INTLK_FIRST", "0:RFREADYFORBEAM"]
+# for when sonya fixes it
+#        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
         for pv in pvList:
             for i in range(3):
                 cavPv.append(str(pv) + codeFlt[i])
@@ -192,7 +159,9 @@ def cmFlts():
     stDHi=[]
 
     aaaa=list(resultsIntlk.keys())
-#    print(aaaa)
+#    print('aaaa {}'.format(aaaa))
+#    print('resultsIntlk[aaaa[0]] {}'.format(resultsIntlk[aaaa[0]]))
+#    print("resultsIntlk[aaaa[0]]['values'] {}".format(resultsIntlk[aaaa[0]]['values']))
     for n in range(0, 37):
         CMtot = []
         for i in range(0, 8):
@@ -270,9 +239,11 @@ def CmStats():
     stDHi=[]
     
     pvList = makList()
-    codeFlt = ["0:FB_SUM", "0:RFS:INTLK_FIRST", "0:RFREADYFORBEAM"]
+#for when sonya fixes it
+#    codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+    codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
     for pv in pvList:
-        CavFltDat= (resultsIntlk[(str(pv)+ codeFlt[1])]['times'])
+        CavFltDat= (resultsIntlk[(str(pv)+ codeFlt[1])]['times']) #was ['times'] not [1]
         CavRdyDat= (resultsRfRdy[(str(pv)+ codeFlt[2])]['times'])
 #get the recover times for a single cavity
         dd=[]
@@ -356,7 +327,10 @@ def cavDatCnt(caVs, sT, fiN):
             #  '16' is an SSA fault and '32 is a cavity quench
             #
             pvL=pv+':RFS:INTLK_FIRST'
-            pvFB = pv+":FB_SUM"
+# for when Sonya fixes it
+#            pvFB = pv+":FB_SUM"
+            pvFB = pv+":PHAFB_SUM"
+#            print('pvFB {}'.format(pvFB))
             #print(pvL, resultsIntlk.keys())
             bozo = {"PLLlock": [], "iocDog": [], "IntlkFlt": [], "CommFlt": [], "SSAFlt": [],
                     "Quench": [], "Clips": []}
@@ -369,7 +343,7 @@ def cavDatCnt(caVs, sT, fiN):
             bozo["CommFlt"] = clwn.count(8)
             bozo["SSAFlt"] = clwn.count(16)
             bozo["Quench"] = clwn.count(32)
-            bozo["Clips"] = len(resultsFB[pvFB]["values"])
+            bozo["Clips"] = len(resultsFB[pvFB]['values']) # was ["values"]
             results[pvL] = bozo
     else:
         results = []
@@ -492,7 +466,7 @@ def XfelDsply(strt):
         for i in range(0, 8):
              tut=aaaa[i+n*8]
 #             print(tut)
-             vTime= sorted( resultsIntlk[tut]['times'])
+             vTime= sorted( resultsIntlk[tut]['times']) #was ['times']
              for v in vTime:
                  b=(datetime.date.fromtimestamp(v))
 #                 print(n,i,b)

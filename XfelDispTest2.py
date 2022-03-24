@@ -93,9 +93,9 @@ class FltDisp(Display):
         EndTimeForArchiver = val2.toPyDateTime().strftime('%m/%d/%Y %H:%M:%S')
         #print(StTimeForArchiver)
         if EndTimeForArchiver > StTimeForArchiver:   # Checks that the End time is after the Start time
-            #arPullGlob.getValuesOverTimeRange(StTimeForArchiver, EndTimeForArchiver)
+            arPullGlob.getValuesOverTimeRange(StTimeForArchiver, EndTimeForArchiver)
             #  Use Dummy value generator for now
-            arPullGlob.getValuesOverTimeDummy(StTimeForArchiver, EndTimeForArchiver)
+            #arPullGlob.getValuesOverTimeDummy(StTimeForArchiver, EndTimeForArchiver)
             if (cmNumUpper!= 0 and HUpper != 0) or (cmNumLower != 0 and HLower != 0):  # This checks if more than one
                                                       # cryomodule is selected to be plotted, if two are selected
                                                       # an error message is written and breaks out of GO function
