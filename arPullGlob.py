@@ -17,9 +17,9 @@ resultsRfRdy={}
 startTime=0
 endTime=0
 
-ARCHIVER_URL_FORMATTER = "http://{MACHINE}-archapp.slac.stanford.edu/retrieval/data/{{SUFFIX}}"
-SINGLE_RESULT_SUFFIX = "getDataAtTime?at={TIME}-07:00&includeProxies=true"
-RANGE_RESULT_SUFFIX = "getData.json"
+#ARCHIVER_URL_FORMATTER = "http://{MACHINE}-archapp.slac.stanford.edu/retrieval/data/{{SUFFIX}}"
+#SINGLE_RESULT_SUFFIX = "getDataAtTime?at={TIME}-07:00&includeProxies=true"
+#RANGE_RESULT_SUFFIX = "getData.json"
 TIMEOUT = 3
 
 def makList():
@@ -38,7 +38,7 @@ def makList():
 
 #******************************************************
 
-def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
+def getValuesOverTimeRange(self,strtTim, endTim, timeInterval=None):
  #       # type: ( datetime, datetime, int) -> Dict[str, Dict[str, List[Union[datetime, str]]]]
 ##
 #J 3/24/22 This function gets archiver data from start to end time for 
@@ -58,15 +58,15 @@ def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
 
     #global cavPvFB, cavPvIntlk, cavPvRfRdy
     if (resultsFB == {}) or (strtTim != (time.mktime(datetime.datetime.strptime(strtTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))) or (endTime != int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))):
-        print("We're in!")
+#        print("We're in!")
         startTime = datetime.datetime.strptime(strtTim, '%m/%d/%Y %H:%M:%S' )
         endTime = datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' )
-        print('Start time {}'.format(startTime))
-        print('End time {}'.format(endTime))
+#        print('Start time {}'.format(startTime))
+#        print('End time {}'.format(endTime))
         cavPv=makList()
 # For after Sonya adds FB_SUM to the list
-#        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
-        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+#        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
         for pv in cavPv:
             cavPvFB.append(str(pv)+codeFlt[0])
             cavPvIntlk.append(str(pv)+codeFlt[1])
@@ -75,8 +75,10 @@ def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
             for i in range(3):
                 pvList.append(str(pv) + codeFlt[i])
 
-        for pv in pvList:
-            print('PV: {}'.format(pv))
+        self.ui.progressBar.show()
+
+        for id,pv in enumerate(pvList):
+#            print('PV: {}'.format(pv))
             archiverData=archiver.getValuesOverTimeRange([pv],startTime,endTime)
             result={"times":[],"values":[]}
             result["values"]=archiverData.values[pv]
@@ -84,6 +86,7 @@ def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
 # convert datetime to posix time
                 result["times"].append(ts.timestamp()) 
             results[pv] = result
+            self.ui.progressBar.setValue(round(100*id/len(pvList)))
 
 #        print(results)
         for cav in cavPvFB:
@@ -92,6 +95,8 @@ def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
             resultsIntlk[cav1]=results[cav1]
         for cav2 in cavPvRfRdy:
             resultsRfRdy[cav2]=results[cav2]
+
+        self.ui.progressBar.hide()
 
     else:
        print('got elsed')
@@ -120,8 +125,8 @@ def getValuesOverTimeDummy(strtTim, endTim, timeInterval=None):
 
         pvList=makList()
 # for when sonya fixes it
-#        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
-        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+#        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
         for pv in pvList:
             for i in range(3):
                 cavPv.append(str(pv) + codeFlt[i])
@@ -291,8 +296,8 @@ def CmStats():
     pvList = makList()
 # PV suffixes
 #for when sonya fixes it
-#    codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
-    codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+    codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+#    codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
 #   for each cavity...
     for pv in pvList:
 #       for all the interlock & RRFB PVs, get the times when PVs changed state
@@ -413,8 +418,8 @@ def cavDatCnt(caVs, sT, fiN):
             #
             pvL=pv+':RFS:INTLK_FIRST'
 # for when Sonya fixes it
-#            pvFB = pv+":FB_SUM"
-            pvFB = pv+":PHAFB_SUM"
+            pvFB = pv+":FB_SUM"
+#            pvFB = pv+":PHAFB_SUM"
 #            print('pvFB {}'.format(pvFB))
             #print(pvL, resultsIntlk.keys())
             bozo = {"PLLlock": [], "iocDog": [], "IntlkFlt": [], "CommFlt": [], "SSAFlt": [],
@@ -559,7 +564,7 @@ def cavStats(cmUpper,cmLower, Start, End):
 #    np.unique sorts and culls but returns an ndarray so
 #    mylist=np.unique(cmtot).tolist() then count in cmtot
 #
-def XfelDsply(strt):
+def XfelDsply(BEGIN,strt):
     bb=[]
     vTime=[]
     totalLo=[]
@@ -567,7 +572,8 @@ def XfelDsply(strt):
     fltCount = {}
 
    # begin = datetime.date(strt.strftime('%Y,%m,%d'))
-    begin= datetime.date(int(2021),int(7),int(22))
+#    begin= datetime.date(int(2021),int(7),int(22))
+    print(BEGIN)
 
     aaaa=list(resultsIntlk.keys())
     for nn in range(0, 37):
@@ -581,7 +587,8 @@ def XfelDsply(strt):
              for vv in vTime:
                  bb=(datetime.date.fromtimestamp(vv))
 #                 print(n,i,b)
-                 daysCnt = bb - begin
+#                 daysCnt = bb - begin
+                 daysCnt = bb - BEGIN.date()
 #                 CMtot.append(datetime.datetime.strftime(b, '%d'))
                  CMtot.append(int(daysCnt.days))
 
@@ -616,12 +623,13 @@ if __name__ == "__main__":
     zzz=[]
     totalLo=[]
     totalHi=[]
+    BEGIN=datetime.dateime(2022,3,25,8,0,0)
     #print(matplotlib.__version__, numpy.__version__)
     #e,f,DisLow,DisHi, DisLoStd, DisHiStd = CmStats(datetime.time,datetime.time)
     #print "e=", e  , "\n\r", "DisLow=", DisLow, "DisLoStd=",DisLoStd
     #e, f, r1,r2,r3,r4  = cavStats("4","27",startDate,endDate)
     #print ("e=",e,"r1=", r1, r2) 
-    squid = XfelDsply(startDate)
+    squid = XfelDsply(BEGIN,startDate)
     #print "e=", e, totLo, StDlo
     #e, f, r1,r2  = cavFaults("4","27",datetime.time,datetime.time)
     #print ("r1=", r1)
