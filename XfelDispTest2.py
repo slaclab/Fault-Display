@@ -17,7 +17,8 @@ from random import randint, random
 import datetime
 import arPullGlob
 
-
+# When commissioning began
+BEGIN=datetime.datetime(2022,3,25,8,0,0)
 
 i=0
 
@@ -48,16 +49,19 @@ class FltDisp(Display):
         UpperPlot = MplCanvas(self, width=5, height=4, dpi=100)  #This defines the plot sizes and attributes
         LowerPlot = MplCanvas(self, width=5, height=4, dpi=100)  # as matplotlib Figures
         XfelPlot = MplCanvas(self, width = 5, height =10, dpi=100)
-        
+
         self.ui.Plot1.addWidget(UpperPlot)                       # write the UpperPlot Figure as a widget to the Plot1
                                                                  # frame in the FltDisp.ui pydm display
-        self.ui.Plot2.addWidget(LowerPlot) 
+        self.ui.Plot2.addWidget(LowerPlot)
         #self.ui.Plot2.addwidget(XfelPlot)                     # Write the LowerPlot Figure as a widget to the
                                                                  # Plot2 frame in the FltDisp.ui
         #self.ui.frame_5.addWidget(XfelPlot)
-        
+        self.ui.progressBar.hide()
+        self.ui.EndTime.setDateTime(datetime.datetime.now())
+        self.ui.StartTime.setDateTime(BEGIN)
+
         self.selectWindow = Display(ui_filename=getPath("CMSelector.ui"))  # Set the 'selectWindow' to the cryomodule
-#        self.xfDisp =Display(ui_filename=getPath("XfelDisp.ui"))   
+#        self.xfDisp =Display(ui_filename=getPath("XfelDisp.ui"))
 #        self.xfDisp.ui.Plot3.addWidget(XfelPlot)
         self.ui.CMSelection.clicked.connect(self.CM_Sel)                   # When the CMSelection button is clicked,
                                                                            # call the function to display the ui
@@ -70,7 +74,7 @@ class FltDisp(Display):
         spinVal = i
         dispVal = self.ui.RfFltSel.currentText()
 #        print(spinVal, dispVal)
-        
+
     def CM_Sel(self):                                  # This pops up the CMSelector.ui and writes text to the
         self.showDisplay(self.selectWindow)            # "Sel_Instructions label" in the ui
         self.selectWindow.ui.Sel_Instructions.setText("One Cryomodule may be selected for each of the Upper and Lower plots")
@@ -93,7 +97,7 @@ class FltDisp(Display):
         EndTimeForArchiver = val2.toPyDateTime().strftime('%m/%d/%Y %H:%M:%S')
         #print(StTimeForArchiver)
         if EndTimeForArchiver > StTimeForArchiver:   # Checks that the End time is after the Start time
-            arPullGlob.getValuesOverTimeRange(StTimeForArchiver, EndTimeForArchiver)
+            arPullGlob.getValuesOverTimeRange(self,StTimeForArchiver, EndTimeForArchiver)
             #  Use Dummy value generator for now
             #arPullGlob.getValuesOverTimeDummy(StTimeForArchiver, EndTimeForArchiver)
             if (cmNumUpper!= 0 and HUpper != 0) or (cmNumLower != 0 and HLower != 0):  # This checks if more than one
@@ -375,7 +379,7 @@ class FltDisp(Display):
         labStart= StTim.toString('d MM yy')
         labEnd = EnTim.toString('d MM yy')
 #        print(labStart, labEnd)
-        squid=arPullGlob.XfelDsply(StTim) 
+        squid=arPullGlob.XfelDsply(BEGIN,StTim) 
         for i in range(17):
            days.append(squid[i][0])
            zzz.append(squid[i][1])

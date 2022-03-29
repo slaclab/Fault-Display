@@ -17,9 +17,9 @@ resultsRfRdy={}
 startTime=0
 endTime=0
 
-ARCHIVER_URL_FORMATTER = "http://{MACHINE}-archapp.slac.stanford.edu/retrieval/data/{{SUFFIX}}"
-SINGLE_RESULT_SUFFIX = "getDataAtTime?at={TIME}-07:00&includeProxies=true"
-RANGE_RESULT_SUFFIX = "getData.json"
+#ARCHIVER_URL_FORMATTER = "http://{MACHINE}-archapp.slac.stanford.edu/retrieval/data/{{SUFFIX}}"
+#SINGLE_RESULT_SUFFIX = "getDataAtTime?at={TIME}-07:00&includeProxies=true"
+#RANGE_RESULT_SUFFIX = "getData.json"
 TIMEOUT = 3
 
 def makList():
@@ -38,8 +38,14 @@ def makList():
 
 #******************************************************
 
-def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
- #       # type: (List[str], datetime, datetime, int) -> Dict[str, Dict[str, List[Union[datetime, str]]]]
+def getValuesOverTimeRange(self,strtTim, endTim, timeInterval=None):
+ #       # type: ( datetime, datetime, int) -> Dict[str, Dict[str, List[Union[datetime, str]]]]
+##
+#J 3/24/22 This function gets archiver data from start to end time for 
+#           3 PVs per cavity for all 37
+#           cryomodules and loads the data into three global dicts (resultsFB, 
+#           resultsIntlk, resultsRfRdy) keyed to PV name
+#
     global resultsFB, resultsIntlk, resultsRfRdy, startTime, endTime
     pvList=[]
     results={}
@@ -52,15 +58,15 @@ def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
 
     #global cavPvFB, cavPvIntlk, cavPvRfRdy
     if (resultsFB == {}) or (strtTim != (time.mktime(datetime.datetime.strptime(strtTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))) or (endTime != int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))):
-        print("We're in!")
+#        print("We're in!")
         startTime = datetime.datetime.strptime(strtTim, '%m/%d/%Y %H:%M:%S' )
         endTime = datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' )
-        print('Start time {}'.format(startTime))
-        print('End time {}'.format(endTime))
+#        print('Start time {}'.format(startTime))
+#        print('End time {}'.format(endTime))
         cavPv=makList()
 # For after Sonya adds FB_SUM to the list
-#        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
-        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+#        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
         for pv in cavPv:
             cavPvFB.append(str(pv)+codeFlt[0])
             cavPvIntlk.append(str(pv)+codeFlt[1])
@@ -69,15 +75,19 @@ def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
             for i in range(3):
                 pvList.append(str(pv) + codeFlt[i])
 
-        for pv in pvList:
-            print('PV: {}'.format(pv))
+        self.ui.progressBar.show()
+
+        for id,pv in enumerate(pvList):
+#            print('PV: {}'.format(pv))
             archiverData=archiver.getValuesOverTimeRange([pv],startTime,endTime)
             result={"times":[],"values":[]}
             result["values"]=archiverData.values[pv]
             for ts in archiverData.timeStamps[pv]:
-                result["times"].append(ts.timestamp()) # convert datetime to posix time
+# convert datetime to posix time
+                result["times"].append(ts.timestamp()) 
             results[pv] = result
-    
+            self.ui.progressBar.setValue(round(100*id/len(pvList)))
+
 #        print(results)
         for cav in cavPvFB:
             resultsFB[cav]=results[cav]
@@ -85,15 +95,20 @@ def getValuesOverTimeRange(strtTim, endTim, timeInterval=None):
             resultsIntlk[cav1]=results[cav1]
         for cav2 in cavPvRfRdy:
             resultsRfRdy[cav2]=results[cav2]
-    
+
+        self.ui.progressBar.hide()
+
     else:
        print('got elsed')
        return;
-            
+
 
 
 #******************************************************
-
+##
+#J 3/24/22 This is the function to load up the global arrays of results 
+#          (see comments for GetValuesOverTimeRange) with dummy data
+#
 def getValuesOverTimeDummy(strtTim, endTim, timeInterval=None):
     global resultsFB, resultsIntlk, resultsRfRdy, startTime, endTime
     results={}
@@ -107,11 +122,11 @@ def getValuesOverTimeDummy(strtTim, endTim, timeInterval=None):
         #print('oops.  fell through')
         startTime = int(time.mktime(datetime.datetime.strptime(strtTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))
         endTime = int(time.mktime(datetime.datetime.strptime(endTim, '%m/%d/%Y %H:%M:%S' ).timetuple()))
-             
+
         pvList=makList()
 # for when sonya fixes it
-#        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
-        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+        codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+#        codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
         for pv in pvList:
             for i in range(3):
                 cavPv.append(str(pv) + codeFlt[i])
@@ -142,15 +157,32 @@ def getValuesOverTimeDummy(strtTim, endTim, timeInterval=None):
 
 
 #******************************************************
-        
 def cmFlts():
-###
+#
     #   cmFlts determines the sum of the number of cryomodule faults from the global 
     #  resultsFB, resultsIntlk, resultsRfRdy Dicts  which are generated by the archiver calls
     #  ReWrite complete
-    
-    b=[]
-    c=[]
+##
+#J 3/24/22 I loathe single character variable names-makes it so hard to search, so I doubled them.
+#     Called by XfelDispTest2.py:
+#        CmNumTop, CmNumLow, numFltsTop, numFltsLow, StDTop, StDLow = arPullGlob.cmFlts()
+#     Function:
+#          For each cavity in a given cryomodule the Intlk data is concatenated,
+#          then summed/stdev into total and stDev variables.
+#          These values are then divided into totalLo/stDLo for CM0-15 and
+#          totalHi/stDHi for CM16-35.
+#          A tuple of bb, cc, totalLo, totalHi, stDLo, stDHi is returned.
+#          More elecgant to fill totalLo/Hi without intermediate total?
+#          bb & cc seem to be lists of numbers 0..16 and 17..37, 
+#          there's gotta be a better way to do that too.
+#          aaaa is the list of interlock PVs (keys into results dict), one per cavity.
+#          this allows the sum of the values for the 8 cav in each CM. Would search for 
+#          CM string prefix be faster or more elegant than the numeric 0..7, 8..15, ? 
+#
+#    Bob's comment says he looks at all 3 global dicts rather but it's just resultsIntlk
+##
+    bb=[]
+    cc=[]
     total=[]
     totalLo = []
     totalHi=[]
@@ -160,59 +192,70 @@ def cmFlts():
 
     aaaa=list(resultsIntlk.keys())
 #    print('aaaa {}'.format(aaaa))
-#    print('resultsIntlk[aaaa[0]] {}'.format(resultsIntlk[aaaa[0]]))
-#    print("resultsIntlk[aaaa[0]]['values'] {}".format(resultsIntlk[aaaa[0]]['values']))
-    for n in range(0, 37):
+    for nn in range(0, 37):
         CMtot = []
-        for i in range(0, 8):
-             tut=aaaa[i+n*8]
-    
+        for ii in range(0, 8):
+             tut=aaaa[ii+nn*8]
              CMtot.append(len(resultsIntlk[tut]['values']))
+
         total.append(numpy.sum(CMtot))
         stDev.append(numpy.std(CMtot))
-    
-    for i in range(17):
-            totalLo.append(total[i])
-            stDLo.append(stDev[i])
-            b.append(i + 1)
-    for i in range(17, 37):
-            totalHi.append(total[i])
-            stDHi.append(stDev[i])
-            c.append(i - 1)
-    
-    return b,c,totalLo, totalHi, stDLo, stDHi;
+
+    for ii in range(17):
+            totalLo.append(total[ii])
+            stDLo.append(stDev[ii])
+            bb.append(ii + 1)
+    for ii in range(17, 37):
+            totalHi.append(total[ii])
+            stDHi.append(stDev[ii])
+            cc.append(ii - 1)
+
+    return bb,cc,totalLo, totalHi, stDLo, stDHi;
+
 #****************************************************
 
 #****************************************************
+##
+#J 3/24/22 - doubled the index variables
+#    Called from within cmStats:
+#        dd=sortStats(CavFltDat,CavRdyDat)
+#          returns FltTime
+#     cavFltDat & CavRdyDat are the times when those PVs (INTLK_FIRST & RRFB) change state
+#     He's looking for how long between recovery (RRFB->1) and previous trip 
+#     As best as I can tell, he's returning a list of # of seconds of down for each trip
+#     I think this algorithm could miss the first trip
+#     Could we look at the RRFB values, watch for 0->1 and subtract previous 1->0 time?
+#   at end he checks for if cavFaults=[] - needs to change to CavFlts presumably.
+##
 def sortStats(CavFlts, CavRdy):
-    i=0
-    n=0
+    ii=0
+    nn=0
     FltTime=[]
     dd=[]
-    while i <= (len(CavFlts) - 1):
-       Flt = CavFlts[i]
-       Rdy =CavRdy[n]
+    while ii <= (len(CavFlts) - 1):
+       Flt = CavFlts[ii]
+       Rdy = CavRdy[nn]
 
-       if (int(Rdy) >= int(Flt)) and ((i + 1) <= len(CavFlts)) and ((n + 1) <= len(CavRdy)):
+       if (int(Rdy) >= int(Flt)) and ((ii + 1) <= len(CavFlts)) and ((nn + 1) <= len(CavRdy)):
            FltTime.append(int(Rdy) - int(Flt))
-           while (int(Flt) <= int(Rdy)) and ((i + 1) <= len(CavFlts)):
+           while (int(Flt) <= int(Rdy)) and ((ii + 1) <= len(CavFlts)):
               try:
-                i += 1
-                if (i + 1) <= len(CavFlts):
-                   Flt = CavFlts[i]
+                ii += 1
+                if (ii + 1) <= len(CavFlts):
+                   Flt = CavFlts[ii]
                 continue
               except IndexError:
-                #print("incremented i too far")
+                #print("incremented ii too far")
                 break
 
-       elif (int(Flt) >= int(Rdy)) and ((n + 1) < len(CavRdy)):
+       elif (int(Flt) >= int(Rdy)) and ((nn + 1) < len(CavRdy)):
            try:
               while (Flt >= Rdy):
-                n += 1
-                Rdy = CavRdy[n]
+                nn += 1
+                Rdy = CavRdy[nn]
                 continue
            except IndexError:
-              #print("incremented n too far")
+              #print("incremented nn too far")
               break
        else:
            break
@@ -223,10 +266,21 @@ def sortStats(CavFlts, CavRdy):
 #***************************************************
 
 #***************************************************
+##
+#J 3/24/22  doubled the single letter variables
+#    Called in XfelDispTest2.cmStats: (don't confuse CmStats with cmStats...)
+#       CmNumTop, CmNumLow, MeanRecTop, MeanRecLow, StDevRec, StDevRec2 = arPullGlob.CmStats()
+#    Return statement:
+#        return bb,cc,totalLo, totalHi, stDLo, stDHi;
+#    bb/cc are lists of CM numbers 0-15 and 16-35
+#    Top/Low refers to the two plots on the fault display gui
+# TODO: What are the keys in the resultsIntlk dict? Is it just the INTLK_FIRST PVs?
+#
 def CmStats():
+# Lisa says global isn't required - if PVs are at the top of the file, then they're global
     global resultsIntlk, resultsRfRdy
-    b=[]
-    c=[]
+    bb=[]
+    cc=[]
     dd=[]
     cavTot =[]
     CMtot=[]
@@ -237,45 +291,78 @@ def CmStats():
     stDev=[]
     stDLo=[]
     stDHi=[]
-    
+
+# get list of PV prefixes (ACCL:L0B:0110:, ...)
     pvList = makList()
+# PV suffixes
 #for when sonya fixes it
-#    codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
-    codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+    codeFlt = ["FB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+#    codeFlt = ["PHAFB_SUM", "RFS:INTLK_FIRST", "RFREADYFORBEAM"]
+#   for each cavity...
     for pv in pvList:
-        CavFltDat= (resultsIntlk[(str(pv)+ codeFlt[1])]['times']) #was ['times'] not [1]
+#       for all the interlock & RRFB PVs, get the times when PVs changed state
+#        don't see why this needds to be str(pv)
+        CavFltDat= (resultsIntlk[(str(pv)+ codeFlt[1])]['times'])
         CavRdyDat= (resultsRfRdy[(str(pv)+ codeFlt[2])]['times'])
-#get the recover times for a single cavity
+#     get the recovery times for a single cavity - this is a list of # of seconds off for each trip
         dd=[]
         dd=sortStats(CavFltDat,CavRdyDat)
         #print dd
-        xx = numpy.array(dd)
+# This statement isn't needed
+#        xx = numpy.array(dd)
+#J 3/24/22 Change xx in cavTot statement to dd.
         # set division factor for appropriate unit of time; hours, min, or sec
-        cavTot.append(numpy.sum(xx)/60.0/60/60)
-    
+# I don't understand why not 60/60/24 to get days? total is in seconds I think. Posix time is sec since 1/1/70
+# cavTot is list of # of sec off for each CM
+        cavTot.append(numpy.sum(dd)/60.0/60/60)
+###
+# What about
+#    downtimeArr=np.reshape(cavTot,(37,8))
+#    totalLo=np.sum(downtimeArr,1).tolist()[0:17]
+#    stDLo=np.std(downtimeArr,1).tolist()[0:17]
+#    totalHi=np.sum(downtimeArr,1).tolist()[17:]
+#    stDHi=np.std(downtimeArr,1).tolist()[17:]
+#    bb=list(range(17))
+#    cc=list(range(17,37))
+###
+
     #print(len(cavTot))
-    for n in range(0,37):
+# for each CM...
+    for nn in range(0,37):
         CMtot=[]
-        for i in range(0,8):
-            indCav = i + n*8.0
+        for ii in range(0,8):
+            indCav = ii + nn*8.0
+# make a list of its 8 cavities' downtimes
             CMtot.append(cavTot[int(indCav)])
+# Then sum, average, and get stdev for those 8 numbers
         total.append(numpy.sum(CMtot))
         average.append(numpy.mean(CMtot))
         stDev.append(numpy.std(CMtot))
 #    print(total)
-    for i in range(17):
-        totalLo.append(average[i])
-        stDLo.append(stDev[i])
-        b.append(i+1)
-    for i in range(17,37):
-        totalHi.append(average[i])
-        stDHi.append(stDev[i])
-        c.append(i-1)
-    return b,c,totalLo, totalHi, stDLo, stDHi;
+    for ii in range(17):
+        totalLo.append(average[ii])
+        stDLo.append(stDev[ii])
+        bb.append(ii+1)
+    for ii in range(17,37):
+        totalHi.append(average[ii])
+        stDHi.append(stDev[ii])
+        cc.append(ii-1)
+    return bb,cc,totalLo, totalHi, stDLo, stDHi;
 #***************************************************
 
 #***************************************************
 def makCavPv(spinOut):
+##
+#J 3/24/22 fix the single letter variables...
+#   Called by cavFaults and cavStats:
+#    pvCav, cavU = makCavPv(cmUpper)
+#    pvCav, cavL = makCavPv(cmLower)
+#
+#   takes the output of the combo box (00, 01, 02, H1, H2, 03, ... 35)
+#    and returns pv2=ACCL:LxB:CM(10, 20, ..., 80) for just one CM 
+#    and cav=CM-(10, 20, ..., 80)
+#   presumably for axis labels?
+##
     pv2 = []
     pvL = ""
     cav = []
@@ -293,34 +380,37 @@ def makCavPv(spinOut):
             pvL = "ACCL:L2B:" + str(spinOut)
         if 15 < int(spinOut) < 36:
             pvL = "ACCL:L3B:" + str(spinOut)
-    for i in range(1, 9):
-        alpha = pvL + str(i) + "0"
+    for ii in range(1, 9):
+        alpha = pvL + str(ii) + "0"
         # print(alpha)
         pv2.append(alpha)
+# use str(dig).zfill(2) to get 01, 02, ... 10, ...37
+# What type is spinOut? works for both strings and ints!
         if len(str(spinOut)) == 1:
-            cav.append("0"+str(spinOut) + "-" + str(i) + "0")
+            cav.append("0"+str(spinOut) + "-" + str(ii) + "0")
         else:
             cav.append(str(spinOut)+"-"+str(i)+"0")
     if str(spinOut) == "Not":
         pv2 = "NaN"
     return pv2, cav;
 #***********************************************
-#
-#
+##
+#J 3/24/22
+#    Called by cavFaults
+#    resP = cavDatCnt(pvCav,Start, End) for upper and resP2= for lower
+#     pvCav is output of makCavPv, start and end are passed into cavFaults
+#     pvCav=['ACCL:LxB:CM10', 'ACCL:LxB:CM20', ..., 'ACCL:LxB:CM80']
+#     sT and fiN are unused. 
+#     bozo is the dictionary with the different types of faults (PLL lock, ioc watchdog etc) 
+#        as the keys and the values are the number of times those fault occurred.
+#     clown is the INTLK_FIRST archiver values which are then counted to fill out bozo
+#    returns: dictionary results[pvl]=bozo, pvl is one CM's <prefix>:RFS:INTLK_FIRST
+#     originally (deleted the comments) the code got the data from the archiver thus it needed st & fin
+##
 def cavDatCnt(caVs, sT, fiN):
     results={}
     if caVs != "NaN":
-        # cavPv = []
-        # reFbSults=[]
-        # reIntlkSults = []
-        # codeFlt = ["0:FB_SUM", "0:RFS:INTLK_FIRST", "0:RFREADYFORBEAM"]
-        # for pv in pvLow:
-        #    for i in range(2):
-        #        cavPv.append(str(pv) + codeFlt[i])
-        #    result = archiver.getValuesOverTimeRange(cavPv[0], sT, fiN)
-        #    result2 = archiver.getValuesOverTimeRange(cavPv[1], sT, fiN)
         for pv in caVs:
-
             #
             #  bozo and clwn are variables to count the number for each type of fault in the dataset
             #  fault code '1' is PLL lock, '2' is ioc watchdog, '4' is the Interlock Fault summary, '8' is Comm fault
@@ -328,8 +418,8 @@ def cavDatCnt(caVs, sT, fiN):
             #
             pvL=pv+':RFS:INTLK_FIRST'
 # for when Sonya fixes it
-#            pvFB = pv+":FB_SUM"
-            pvFB = pv+":PHAFB_SUM"
+            pvFB = pv+":FB_SUM"
+#            pvFB = pv+":PHAFB_SUM"
 #            print('pvFB {}'.format(pvFB))
             #print(pvL, resultsIntlk.keys())
             bozo = {"PLLlock": [], "iocDog": [], "IntlkFlt": [], "CommFlt": [], "SSAFlt": [],
@@ -350,6 +440,17 @@ def cavDatCnt(caVs, sT, fiN):
     return results;
 #
 #***********************************************
+##
+#J 3/24/22
+#   Called by XfelDispTest2.cavFaults (not kidding)
+#    CavNumTop, CavNumLower, CavFaultsUpper, CavFaultsLower = arPullGlob.cavFaults(OutTextUpper, OutTextLower, StTim, EnTim)
+#      OutTextUpper -> cmUpper = upper CM spinner, OutTextLower -> cmLower = lower CM spinner
+#        makCavPv returns  ['ACCL:LxB:CM10',...,'ACCL:LxB:CM80'],['CM-10','CM-20',...]
+#        cavDatCnt returns dictionary keyed by PV prefix +RFS:INTLK_FIRST with dictionary as value which
+#          has fault types as keys and # of that type of fault as values
+#   Returns  cavU, cavL, resP, resP2;
+#     cavU is CM-## for upper, cavL is CM-## for lower, 
+#      resP is fault type dictionary for upper CM, resP2 is lower.
 def cavFaults(cmUpper, cmLower, Start, End):
     if cmUpper != "Not":
         pvCav, cavU = makCavPv(cmUpper)
@@ -367,6 +468,16 @@ def cavFaults(cmUpper, cmLower, Start, End):
     return cavU, cavL, resP, resP2;
 #******************************************************
 #
+##
+#J 3/24/22 doubled the single letter variable names, which aren't used...
+#  called by cavStats twice - once for each spinner:
+#          resPave, resPstd = cavStatCnt(pvCav,Start,End)
+#         pvCav is the 8 prefixes for a given CM
+#         start and end are no longer used (deleted commented code that called archiver)
+# For each of the 8 cavities, he gets a list of seconds down for each trip then 
+#    gets the mean and std of that list, divides by 60 to get minutes and appends
+#     to lists cavAve and cavStD which are returned:
+#       return cavAve, cavStD;
 def cavStatCnt(Cav, Start, End):
      cc="00"
      dd=[]
@@ -375,40 +486,20 @@ def cavStatCnt(Cav, Start, End):
      cavStD=[]
      results={}
      results2 ={}
-     ##################
-    #  The commented out block calls the archiver for the interlock and clipping faults
-    #############
-    #cavPv = []
-    #reFbSults=[]
-    #reIntlkSults = []
-    #codeFlt = ["0:FB_SUM", "0:RFS:INTLK_FIRST", "0:RFREADYFORBEAM"]
-    #for ca in Cav:
-    #    for i in range(2):
-    #        cavPv.append(str(Cav) + codeFlt[i])
-    #    result = archiver.getValuesOverTimeRange(cavPv[0], Start, End)
-    #    result2 = archiver.getValuesOverTimeRange(cavPv[1], Start, End)
-    #############
 
      for ca in Cav:
         caP = ca +":RFS:INTLK_FIRST"
         caR = ca + ":RFREADYFORBEAM"
-#        print(ca)
-#        result={ca:{"times":[]}}
-#        result2 = {ca:{"times": []}}
-#        for i in range(random.randint(1,15)):
-#             result["times"].append(random.randint(9500,10000))
-#             result2["times"].append(random.randint(9500, 10000))
-#        results[ca]=sorted(result["times"])  #this is the time of the faults
-#        results2[ca]=sorted(result2["times"])  # this is the time that rf shows fully recovered
-        
+
         results[ca]=sorted(resultsIntlk[caP]["times"])  #this is the time of the faults
         results2[ca]=sorted(resultsRfRdy[caR]["times"])  # this is the time that rf shows fully recovered
 #        print(ca,results[ca],results2[ca])
+#J aaaa is pvprefix+"RFS:INTLK_FIRST"
      aaaa = results.keys()
 #     print(aaaa)
      for cav in aaaa:
-        i = 0
-        n = 0
+        ii = 0
+        nn = 0
         CavFltDat = (results[cav])  # get the flt times for a single cavity
         CavRdyDat = (results2[cav])  #get the recover times for a single cavity
         dd=[]
@@ -429,6 +520,16 @@ def cavStatCnt(Cav, Start, End):
 #
 #
 #***********************************************
+##
+#J 3/24/22
+#  Called by cavStats in XfelDispTest2 (still not kidding):
+#    CavNumTop,CavNumLower,cavRec,cavRecStDev, cavRec2,cavRecStDev2 = arPullGlob.cavStats(OutTextUpper, OutTextLower, StTim, EnTim)
+#      OutTextUpper -> cmUpper = upper CM spinner, OutTextLower -> cmLower = lower CM spinner
+#     pvCav is pv prefixes for one CM, cavU/L is ['CM-10','CM-20',...]
+#     resPave, resPstd are the ave/std amounts of time in minutes that a cavity is off
+#  Returns:
+#     return cavU, cavU2, resPave, resPstd, resPave2, resPstd2;
+#
 def cavStats(cmUpper,cmLower, Start, End):
      if cmUpper != "Not":
         pvCav, cavU = makCavPv(cmUpper)
@@ -446,31 +547,48 @@ def cavStats(cmUpper,cmLower, Start, End):
          resPave2 = []
          resPstd2 = []
      return cavU, cavU2, resPave, resPstd, resPave2, resPstd2;
- 
-def XfelDsply(strt):
-    b=[]
+##
+#J 3/24/22 fix the single letter variables
+#     Called by xFelDisplay in XfelDispTest2 (still not kidding...)
+#        squid = arPullGlob.XfelDsply(StTim)
+#   aaaa is all the PVs that end in RFS:FIRST_INTLK (all 37*8 of them)
+#   for each cavity, get the times that it tripped (FIRST_INTLK has value in archiver)
+#      for each of the trips, figure out the date of the trip and calculate how 
+#       many days between the trip and 7/22/2021 then append that number to CMtot
+#       Then find the unique numbers of dates (days since 7/22/21) and 
+#       how many trips on each of those dates and return that as a tuple
+#        fltCount[nn] = fltDay["day"],fltDay["value"]
+# returns fltCount
+
+# I think he's assume that sort culls duplicates, 
+#    np.unique sorts and culls but returns an ndarray so
+#    mylist=np.unique(cmtot).tolist() then count in cmtot
+#
+def XfelDsply(BEGIN,strt):
+    bb=[]
     vTime=[]
     totalLo=[]
     totalHi=[]
     fltCount = {}
 
    # begin = datetime.date(strt.strftime('%Y,%m,%d'))
-    begin= datetime.date(int(2021),int(7),int(22))
-     
-#    print(begin)
+#    begin= datetime.date(int(2021),int(7),int(22))
+    print(BEGIN)
+
     aaaa=list(resultsIntlk.keys())
-    for n in range(0, 37):
+    for nn in range(0, 37):
         CMtot = []
         mylist = []
         fltDay = {"day": [], "value": []}
-        for i in range(0, 8):
-             tut=aaaa[i+n*8]
+        for ii in range(0, 8):
+             tut=aaaa[ii+nn*8]
 #             print(tut)
-             vTime= sorted( resultsIntlk[tut]['times']) #was ['times']
-             for v in vTime:
-                 b=(datetime.date.fromtimestamp(v))
+             vTime= sorted( resultsIntlk[tut]['times'])
+             for vv in vTime:
+                 bb=(datetime.date.fromtimestamp(vv))
 #                 print(n,i,b)
-                 daysCnt = b - begin
+#                 daysCnt = bb - begin
+                 daysCnt = bb - BEGIN.date()
 #                 CMtot.append(datetime.datetime.strftime(b, '%d'))
                  CMtot.append(int(daysCnt.days))
 
@@ -478,17 +596,15 @@ def XfelDsply(strt):
         mylist.sort()
         for CMc in mylist:
              fltDay["day"].append(int(CMc))
-             fltDay["value"].append(CMtot.count(str(CMc)))   
-        fltCount[n] = fltDay["day"],fltDay["value"]
+             fltDay["value"].append(CMtot.count(str(CMc)))
+        fltCount[nn] = fltDay["day"],fltDay["value"]
 #        for i in range(17):
 #           totalLo.append(fltCount[i])
 #        for i in range(17,37):
 #           totalHi.append(fltCount[i])
-        
-    return (fltCount)
-    
 
-    
+    return (fltCount)
+
 
 #    dailyFlts = resultsIntlk
 
@@ -507,12 +623,13 @@ if __name__ == "__main__":
     zzz=[]
     totalLo=[]
     totalHi=[]
+    BEGIN=datetime.dateime(2022,3,25,8,0,0)
     #print(matplotlib.__version__, numpy.__version__)
     #e,f,DisLow,DisHi, DisLoStd, DisHiStd = CmStats(datetime.time,datetime.time)
     #print "e=", e  , "\n\r", "DisLow=", DisLow, "DisLoStd=",DisLoStd
     #e, f, r1,r2,r3,r4  = cavStats("4","27",startDate,endDate)
     #print ("e=",e,"r1=", r1, r2) 
-    squid = XfelDsply(startDate)
+    squid = XfelDsply(BEGIN,startDate)
     #print "e=", e, totLo, StDlo
     #e, f, r1,r2  = cavFaults("4","27",datetime.time,datetime.time)
     #print ("r1=", r1)
